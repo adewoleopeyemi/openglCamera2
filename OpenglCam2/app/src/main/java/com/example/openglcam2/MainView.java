@@ -1,5 +1,10 @@
 package com.example.openglcam2;
 
+import android.app.Activity;
+import android.content.Context;
+import android.opengl.GLSurfaceView;
+import android.view.SurfaceHolder;
+
 import android.content.Context;
 import android.opengl.GLSurfaceView;
 import android.view.SurfaceHolder;
@@ -39,4 +44,3 @@ public class MainView extends GLSurfaceView {
         super.onPause();
     }
 }
-

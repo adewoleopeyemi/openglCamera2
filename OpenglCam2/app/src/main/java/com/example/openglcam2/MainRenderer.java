@@ -29,14 +29,20 @@ import java.util.concurrent.TimeUnit;
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
+import static android.opengl.GLES10.GL_FALSE;
+import static com.example.openglcam2.MatrixHelper.aspect_ratio_correction;
+
 public class MainRenderer implements GLSurfaceView.Renderer, SurfaceTexture.OnFrameAvailableListener {
     private final String vss_default = "" +
             "attribute vec2 vPosition;\n" +
             "attribute vec2 vTexCoord;\n" +
             "varying vec2 texCoord;\n" +
+            "uniform mat4 projection; \n"+
+            "uniform mat4 rotation; \n"+
+            "uniform mat4 scale; \n"+
             "void main() {\n" +
             "  texCoord = vTexCoord;\n" +
-            "  gl_Position = vec4 ( vPosition.x, vPosition.y, 0.0, 1.0 );\n" +
+            "  gl_Position = vec4 ( vPosition.x, vPosition.y, 0.0, 1.0 )*projection *rotation * scale;\n" +
             "}";
 
     private final String fss_default = "" +
@@ -93,6 +99,7 @@ public class MainRenderer implements GLSurfaceView.Renderer, SurfaceTexture.OnFr
         stopBackgroundThread();
     }
 
+    float targetAspectRatio;
     public void onSurfaceCreated ( GL10 unused, EGLConfig config ) {
         initTex();
         mSTexture = new SurfaceTexture ( hTex[0] );
@@ -142,6 +149,19 @@ public class MainRenderer implements GLSurfaceView.Renderer, SurfaceTexture.OnFr
 
     public void onSurfaceChanged ( GL10 unused, int width, int height ) {
         GLES20.glViewport(0, 0, width, height);
+        int projection = GLES20.glGetUniformLocation(hProgram, "projection");
+        int rotation = GLES20.glGetUniformLocation(hProgram,"rotation");
+        int scale = GLES20.glGetUniformLocation(hProgram, "scale");
+        float[] ortho = new float[16];
+        float[] rotate = new float[16];
+        float[] scales = new float[16];
+        float scaleFactor = aspect_ratio_correction(false, width, height, width, height);
+        MatrixHelper.mat4f_load_ortho(ortho, -1f, 1f, -(height/width), height/width,  -1.0f, 1.0f);
+        MatrixHelper.mat4f_load_rotation_z(-90, rotate);
+        MatrixHelper.mat4f_load_scale(scaleFactor, scaleFactor, 1.0f, scales);
+        GLES20.glUniformMatrix4fv(projection, 1, false, ortho, 0);
+        GLES20.glUniformMatrix4fv(rotation, 1, false, rotate, 0);
+        GLES20.glUniformMatrix4fv(scale, 1, false, scales, 0);
     }
 
     private void initTex() {
@@ -159,6 +179,7 @@ public class MainRenderer implements GLSurfaceView.Renderer, SurfaceTexture.OnFr
         mView.requestRender();
     }
 
+
     private static int loadShader ( String vss, String fss ) {
         int vshader = GLES20.glCreateShader(GLES20.GL_VERTEX_SHADER);
         GLES20.glShaderSource(vshader, vss);
@@ -171,7 +192,6 @@ public class MainRenderer implements GLSurfaceView.Renderer, SurfaceTexture.OnFr
             GLES20.glDeleteShader(vshader);
             vshader = 0;
         }
-
         int fshader = GLES20.glCreateShader(GLES20.GL_FRAGMENT_SHADER);
         GLES20.glShaderSource(fshader, fss);
         GLES20.glCompileShader(fshader);
@@ -182,12 +202,10 @@ public class MainRenderer implements GLSurfaceView.Renderer, SurfaceTexture.OnFr
             GLES20.glDeleteShader(fshader);
             fshader = 0;
         }
-
         int program = GLES20.glCreateProgram();
         GLES20.glAttachShader(program, vshader);
         GLES20.glAttachShader(program, fshader);
         GLES20.glLinkProgram(program);
-
         return program;
     }
 
@@ -237,6 +255,7 @@ public class MainRenderer implements GLSurfaceView.Renderer, SurfaceTexture.OnFr
         }
     }
 
+
     private void closeCamera() {
         try {
             mCameraOpenCloseLock.acquire();
@@ -254,6 +273,7 @@ public class MainRenderer implements GLSurfaceView.Renderer, SurfaceTexture.OnFr
             mCameraOpenCloseLock.release();
         }
     }
+
 
     private final CameraDevice.StateCallback mStateCallback = new CameraDevice.StateCallback() {
 
@@ -277,8 +297,8 @@ public class MainRenderer implements GLSurfaceView.Renderer, SurfaceTexture.OnFr
             cameraDevice.close();
             mCameraDevice = null;
         }
-
     };
+
 
     private void createCameraPreviewSession() {
         try {
